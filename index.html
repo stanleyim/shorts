@@ -1,0 +1,828 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>YouTube 트렌드 분석기</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;600;700;900&family=Space+Grotesk:wght@400;600;700&display=swap');
+
+  :root {
+    --bg: #080810;
+    --surface: #10101c;
+    --card: #16162a;
+    --border: #24243a;
+    --accent: #e8003d;
+    --accent2: #ff6230;
+    --text: #eeeef8;
+    --muted: #6a6a8a;
+    --green: #00d97e;
+    --blue: #4da6ff;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'Noto Sans KR', sans-serif;
+    min-height: 100vh;
+  }
+
+  /* HEADER */
+  header {
+    padding: 18px 20px;
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    background: rgba(8,8,16,0.95);
+    position: sticky;
+    top: 0;
+    z-index: 100;
+    backdrop-filter: blur(10px);
+  }
+
+  .header-left { display: flex; align-items: center; gap: 12px; }
+
+  .logo-mark {
+    width: 36px; height: 36px;
+    background: linear-gradient(135deg, var(--accent), var(--accent2));
+    border-radius: 8px;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 18px;
+  }
+
+  header h1 {
+    font-family: 'Space Grotesk', sans-serif;
+    font-size: 16px;
+    font-weight: 700;
+    color: var(--text);
+  }
+
+  header p { font-size: 11px; color: var(--muted); margin-top: 1px; }
+
+  .key-indicator {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 11px;
+    color: var(--muted);
+    cursor: pointer;
+    padding: 6px 10px;
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    background: var(--surface);
+    transition: border-color 0.2s;
+  }
+
+  .key-indicator:hover { border-color: var(--accent); }
+  .key-indicator .dot { width: 6px; height: 6px; border-radius: 50%; background: var(--muted); }
+  .key-indicator .dot.saved { background: var(--green); }
+
+  /* MODAL */
+  .modal-overlay {
+    display: none;
+    position: fixed; inset: 0;
+    background: rgba(0,0,0,0.7);
+    z-index: 200;
+    align-items: center;
+    justify-content: center;
+    padding: 20px;
+  }
+
+  .modal-overlay.show { display: flex; }
+
+  .modal {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 16px;
+    padding: 24px;
+    width: 100%;
+    max-width: 420px;
+  }
+
+  .modal h2 { font-size: 16px; font-weight: 700; margin-bottom: 6px; }
+  .modal p { font-size: 12px; color: var(--muted); margin-bottom: 16px; line-height: 1.5; }
+
+  .modal-input-row {
+    display: flex;
+    gap: 8px;
+    margin-bottom: 12px;
+  }
+
+  .modal input {
+    flex: 1;
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 10px 12px;
+    color: var(--text);
+    font-size: 12px;
+    font-family: monospace;
+    outline: none;
+  }
+
+  .modal input:focus { border-color: var(--accent); }
+
+  .icon-btn {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    color: var(--muted);
+    padding: 10px 12px;
+    cursor: pointer;
+    font-size: 14px;
+    flex-shrink: 0;
+  }
+
+  .modal-btns { display: flex; gap: 8px; }
+
+  .btn-save {
+    flex: 1;
+    background: linear-gradient(135deg, var(--accent), var(--accent2));
+    border: none;
+    border-radius: 8px;
+    color: #fff;
+    font-size: 13px;
+    font-weight: 700;
+    padding: 10px;
+    cursor: pointer;
+    font-family: 'Noto Sans KR', sans-serif;
+  }
+
+  .btn-cancel {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    color: var(--muted);
+    font-size: 13px;
+    padding: 10px 16px;
+    cursor: pointer;
+    font-family: 'Noto Sans KR', sans-serif;
+  }
+
+  /* MAIN */
+  .container { max-width: 860px; margin: 0 auto; padding: 20px 16px 40px; }
+
+  /* SEARCH BOX */
+  .search-box {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    padding: 18px;
+    margin-bottom: 16px;
+  }
+
+  .section-label {
+    font-size: 11px;
+    color: var(--muted);
+    font-family: 'Space Grotesk', sans-serif;
+    letter-spacing: 0.8px;
+    text-transform: uppercase;
+    margin-bottom: 10px;
+  }
+
+  .keyword-chips {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 7px;
+    margin-bottom: 12px;
+  }
+
+  .chip {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 20px;
+    padding: 5px 13px;
+    font-size: 12px;
+    cursor: pointer;
+    color: var(--muted);
+    transition: all 0.15s;
+    user-select: none;
+  }
+
+  .chip.active {
+    background: rgba(232,0,61,0.15);
+    border-color: var(--accent);
+    color: #ff6680;
+  }
+
+  .custom-row {
+    display: flex;
+    gap: 8px;
+    margin-bottom: 14px;
+  }
+
+  .custom-row input {
+    flex: 1;
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 9px 12px;
+    color: var(--text);
+    font-size: 13px;
+    outline: none;
+    font-family: 'Noto Sans KR', sans-serif;
+  }
+
+  .custom-row input:focus { border-color: var(--accent); }
+
+  .run-btn {
+    width: 100%;
+    background: linear-gradient(135deg, var(--accent) 0%, var(--accent2) 100%);
+    border: none;
+    border-radius: 10px;
+    color: #fff;
+    font-size: 14px;
+    font-weight: 700;
+    padding: 13px;
+    cursor: pointer;
+    font-family: 'Noto Sans KR', sans-serif;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    transition: opacity 0.2s, transform 0.1s;
+  }
+
+  .run-btn:hover { opacity: 0.92; }
+  .run-btn:active { transform: scale(0.99); }
+  .run-btn:disabled { opacity: 0.35; cursor: not-allowed; }
+
+  /* STATUS */
+  .status-bar {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 11px 14px;
+    margin-bottom: 14px;
+    font-size: 12px;
+    color: var(--muted);
+    display: none;
+    align-items: center;
+    gap: 10px;
+  }
+
+  .status-bar.show { display: flex; }
+
+  .spinner {
+    width: 14px; height: 14px;
+    border: 2px solid var(--border);
+    border-top-color: var(--accent);
+    border-radius: 50%;
+    animation: spin 0.7s linear infinite;
+    flex-shrink: 0;
+  }
+
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  /* ERROR */
+  .error-box {
+    background: rgba(232,0,61,0.1);
+    border: 1px solid rgba(232,0,61,0.4);
+    border-radius: 10px;
+    padding: 12px 14px;
+    font-size: 12px;
+    color: #ff8099;
+    margin-bottom: 14px;
+    display: none;
+  }
+
+  .error-box.show { display: block; }
+
+  /* RESULTS */
+  .results-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 12px;
+  }
+
+  .results-header h2 { font-size: 14px; font-weight: 700; }
+
+  .badge {
+    background: var(--accent);
+    color: #fff;
+    border-radius: 20px;
+    padding: 2px 10px;
+    font-size: 11px;
+    font-weight: 700;
+    font-family: 'Space Grotesk', sans-serif;
+  }
+
+  .video-grid { display: grid; gap: 12px; }
+
+  .video-card {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    overflow: hidden;
+    transition: border-color 0.2s;
+  }
+
+  .video-card:hover { border-color: rgba(232,0,61,0.5); }
+
+  .card-inner { display: flex; }
+
+  .thumb-wrap {
+    position: relative;
+    width: 168px;
+    min-width: 168px;
+    height: 95px;
+    background: #0a0a18;
+    overflow: hidden;
+    flex-shrink: 0;
+  }
+
+  .thumb-wrap img {
+    width: 100%; height: 100%;
+    object-fit: cover;
+    display: block;
+  }
+
+  .thumb-placeholder {
+    width: 100%; height: 100%;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 28px; color: #2a2a3a;
+  }
+
+  .rank {
+    position: absolute;
+    top: 5px; left: 5px;
+    background: rgba(0,0,0,0.85);
+    color: #fff;
+    font-size: 10px;
+    font-weight: 900;
+    padding: 2px 6px;
+    border-radius: 4px;
+    font-family: 'Space Grotesk', sans-serif;
+  }
+
+  .rank.gold { background: var(--accent); }
+  .rank.silver { background: #888; }
+
+  .card-body {
+    padding: 11px 13px;
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    gap: 7px;
+    min-width: 0;
+  }
+
+  .video-title {
+    font-size: 12px;
+    font-weight: 700;
+    line-height: 1.4;
+    color: var(--text);
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+    text-decoration: none;
+  }
+
+  .video-title:hover { color: #ff6680; }
+
+  .meta-chips {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 5px;
+  }
+
+  .meta-chip {
+    font-size: 10px;
+    padding: 2px 7px;
+    border-radius: 4px;
+    font-family: 'Space Grotesk', sans-serif;
+    font-weight: 600;
+  }
+
+  .mc-views { background: rgba(0,217,126,0.12); color: var(--green); }
+  .mc-channel { background: rgba(77,166,255,0.12); color: var(--blue); }
+  .mc-duration { background: rgba(255,255,255,0.06); color: var(--muted); }
+
+  .pattern-tags {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px;
+  }
+
+  .ptag {
+    font-size: 10px;
+    padding: 2px 6px;
+    border-radius: 3px;
+    background: rgba(232,0,61,0.12);
+    color: #ff6680;
+    border: 1px solid rgba(232,0,61,0.2);
+  }
+
+  /* SUMMARY */
+  .summary-box {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-left: 3px solid var(--accent);
+    border-radius: 12px;
+    padding: 18px;
+    margin-top: 16px;
+  }
+
+  .summary-box h3 {
+    font-size: 12px;
+    font-weight: 700;
+    color: var(--accent);
+    font-family: 'Space Grotesk', sans-serif;
+    letter-spacing: 0.5px;
+    text-transform: uppercase;
+    margin-bottom: 10px;
+  }
+
+  .summary-box p {
+    font-size: 12px;
+    line-height: 1.8;
+    color: #bbbbd0;
+    white-space: pre-line;
+  }
+
+  @media (max-width: 480px) {
+    .thumb-wrap { width: 120px; min-width: 120px; height: 68px; }
+    .card-body { padding: 8px 10px; }
+    header h1 { font-size: 14px; }
+  }
+</style>
+</head>
+<body>
+
+<!-- HEADER -->
+<header>
+  <div class="header-left">
+    <div class="logo-mark">📊</div>
+    <div>
+      <h1>YouTube 트렌드 분석기</h1>
+      <p>정치 · 사회 · 뉴스 · 풍자</p>
+    </div>
+  </div>
+  <div class="key-indicator" onclick="openModal()">
+    <div class="dot" id="keyDot"></div>
+    <span id="keyLabel">API 키 설정</span>
+  </div>
+</header>
+
+<!-- API KEY MODAL -->
+<div class="modal-overlay" id="modalOverlay">
+  <div class="modal">
+    <h2>🔑 Apify API 토큰</h2>
+    <p>토큰은 이 브라우저에만 저장됩니다.<br>외부로 전송되지 않습니다.</p>
+    <div class="modal-input-row">
+      <input type="password" id="modalKeyInput" placeholder="apify_api_xxxxxxxxxxxxxxxx" />
+      <button class="icon-btn" onclick="toggleModalKey()">👁</button>
+    </div>
+    <div class="modal-btns">
+      <button class="btn-cancel" onclick="closeModal()">취소</button>
+      <button class="btn-save" onclick="saveKey()">저장</button>
+    </div>
+  </div>
+</div>
+
+<!-- MAIN -->
+<div class="container">
+
+  <!-- SEARCH -->
+  <div class="search-box">
+    <div class="section-label">키워드 선택</div>
+    <div class="keyword-chips">
+      <div class="chip active" onclick="toggleChip(this)">정치</div>
+      <div class="chip active" onclick="toggleChip(this)">사회</div>
+      <div class="chip active" onclick="toggleChip(this)">뉴스</div>
+      <div class="chip active" onclick="toggleChip(this)">풍자</div>
+      <div class="chip" onclick="toggleChip(this)">시사</div>
+      <div class="chip" onclick="toggleChip(this)">코미디</div>
+      <div class="chip" onclick="toggleChip(this)">쇼츠</div>
+      <div class="chip" onclick="toggleChip(this)">국회</div>
+      <div class="chip" onclick="toggleChip(this)">대통령</div>
+    </div>
+    <div class="custom-row">
+      <input type="text" id="customKw" placeholder="직접 입력 (예: 탄핵 풍자)" />
+    </div>
+    <button class="run-btn" id="runBtn" onclick="runAnalysis()">
+      ▶ 상위 10개 영상 분석 시작
+    </button>
+  </div>
+
+  <!-- STATUS -->
+  <div class="status-bar" id="statusBar">
+    <div class="spinner"></div>
+    <span id="statusText">분석 중...</span>
+  </div>
+
+  <!-- ERROR -->
+  <div class="error-box" id="errorBox"></div>
+
+  <!-- RESULTS -->
+  <div id="resultsWrap" style="display:none;">
+    <div class="results-header">
+      <h2>분석 결과</h2>
+      <span class="badge" id="countBadge">0개</span>
+    </div>
+    <div class="video-grid" id="videoGrid"></div>
+    <div class="summary-box" id="summaryBox" style="display:none;">
+      <h3>🤖 제목 패턴 종합 분석</h3>
+      <p id="summaryText"></p>
+    </div>
+  </div>
+
+</div>
+
+<script>
+// ── API KEY ──────────────────────────────────────────
+const STORAGE_KEY = 'apify_token_shorts';
+
+function loadKey() {
+  return localStorage.getItem(STORAGE_KEY) || '';
+}
+
+function updateKeyIndicator() {
+  const k = loadKey();
+  const dot = document.getElementById('keyDot');
+  const label = document.getElementById('keyLabel');
+  if (k) {
+    dot.classList.add('saved');
+    label.textContent = 'API 키 ✓';
+  } else {
+    dot.classList.remove('saved');
+    label.textContent = 'API 키 설정';
+  }
+}
+
+function openModal() {
+  const k = loadKey();
+  document.getElementById('modalKeyInput').value = k;
+  document.getElementById('modalOverlay').classList.add('show');
+}
+
+function closeModal() {
+  document.getElementById('modalOverlay').classList.remove('show');
+}
+
+function toggleModalKey() {
+  const inp = document.getElementById('modalKeyInput');
+  inp.type = inp.type === 'password' ? 'text' : 'password';
+}
+
+function saveKey() {
+  const val = document.getElementById('modalKeyInput').value.trim();
+  if (!val) { alert('토큰을 입력하세요.'); return; }
+  localStorage.setItem(STORAGE_KEY, val);
+  updateKeyIndicator();
+  closeModal();
+}
+
+// ── CHIPS ─────────────────────────────────────────────
+function toggleChip(el) { el.classList.toggle('active'); }
+
+function getKeywords() {
+  const chips = [...document.querySelectorAll('.chip.active')].map(c => c.textContent);
+  const custom = document.getElementById('customKw').value.trim();
+  if (custom) chips.push(custom);
+  return chips;
+}
+
+// ── UI HELPERS ────────────────────────────────────────
+function setStatus(msg) {
+  document.getElementById('statusBar').classList.add('show');
+  document.getElementById('statusText').textContent = msg;
+}
+
+function hideStatus() {
+  document.getElementById('statusBar').classList.remove('show');
+}
+
+function showError(msg) {
+  const el = document.getElementById('errorBox');
+  el.textContent = '⚠️ ' + msg;
+  el.classList.add('show');
+}
+
+function clearError() {
+  const el = document.getElementById('errorBox');
+  el.textContent = '';
+  el.classList.remove('show');
+}
+
+function formatViews(n) {
+  if (!n || isNaN(n)) return '-';
+  n = parseInt(n);
+  if (n >= 10000000) return (n/1000000).toFixed(0) + 'M';
+  if (n >= 1000000) return (n/1000000).toFixed(1) + 'M';
+  if (n >= 10000) return Math.round(n/1000) + 'K';
+  if (n >= 1000) return (n/1000).toFixed(1) + 'K';
+  return n.toLocaleString();
+}
+
+// ── APIFY ─────────────────────────────────────────────
+async function runApify(apiKey, query) {
+  const startRes = await fetch(
+    'https://api.apify.com/v2/acts/streamers~youtube-scraper/runs',
+    {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${apiKey}`
+      },
+      body: JSON.stringify({
+        searchKeywords: query,
+        maxResults: 10,
+        maxResultsShorts: 0,
+        sortVideosBy: 'view count',
+        downloadSubtitles: false,
+        saveSubsToKVS: false
+      })
+    }
+  );
+
+  if (!startRes.ok) {
+    let msg = 'Apify 실행 실패';
+    try { const e = await startRes.json(); msg = e.error?.message || msg; } catch(_) {}
+    throw new Error(msg + ' (API 토큰을 확인하세요)');
+  }
+
+  const { data: runData } = await startRes.json();
+  const runId = runData.id;
+
+  // Poll
+  for (let i = 0; i < 60; i++) {
+    await sleep(3000);
+    setStatus(`분석 중... ${(i+1)*3}초 경과`);
+
+    const r = await fetch(
+      `https://api.apify.com/v2/acts/streamers~youtube-scraper/runs/${runId}`,
+      { headers: { 'Authorization': `Bearer ${apiKey}` } }
+    );
+    const { data: rd } = await r.json();
+
+    if (rd.status === 'SUCCEEDED') {
+      const ir = await fetch(
+        `https://api.apify.com/v2/datasets/${rd.defaultDatasetId}/items?limit=10`,
+        { headers: { 'Authorization': `Bearer ${apiKey}` } }
+      );
+      return await ir.json();
+    }
+
+    if (rd.status === 'FAILED' || rd.status === 'ABORTED') {
+      throw new Error(`Apify 실행 ${rd.status}`);
+    }
+  }
+
+  throw new Error('시간 초과 (3분). 다시 시도하세요.');
+}
+
+const sleep = ms => new Promise(r => setTimeout(r, ms));
+
+// ── TITLE PATTERN ─────────────────────────────────────
+function analyzeTitle(title) {
+  const tags = [];
+  if (!title) return tags;
+  if (/[!！?？]{2,}/.test(title)) tags.push('강한 감탄/의문');
+  else if (/[!！?？]/.test(title)) tags.push('감탄/의문');
+  if (/\d+/.test(title)) tags.push('숫자 포함');
+  if (title.length <= 15) tags.push('초단형');
+  else if (title.length <= 25) tags.push('단형');
+  else if (title.length >= 50) tags.push('장형');
+  if (/속보|긴급|단독|특보|충격/.test(title)) tags.push('긴급성');
+  if (/폭로|비밀|진실|실체|내막/.test(title)) tags.push('폭로형');
+  if (/풍자|패러디|개그|코미디|ㅋ/.test(title)) tags.push('유머형');
+  if (/결국|드디어|마침내|충격/.test(title)) tags.push('반전형');
+  if (/[""『』「」]/.test(title)) tags.push('인용형');
+  return tags;
+}
+
+// ── RENDER ───────────────────────────────────────────
+function renderResults(videos) {
+  const grid = document.getElementById('videoGrid');
+  grid.innerHTML = '';
+
+  document.getElementById('countBadge').textContent = videos.length + '개';
+  document.getElementById('resultsWrap').style.display = 'block';
+
+  videos.forEach((v, i) => {
+    const title = v.title || v.videoTitle || '제목 없음';
+    const views = v.viewCount || v.views || v.viewsCount || 0;
+    const channel = v.channelName || v.authorName || v.channel || '-';
+    const thumb = v.thumbnailUrl || v.videoThumbnail || v.thumbnail || '';
+    const url = v.url || v.videoUrl || v.videoUrlShort || '#';
+    const duration = v.duration || '';
+
+    const tags = analyzeTitle(title);
+    const rankClass = i === 0 ? 'gold' : i < 3 ? 'silver' : '';
+
+    const card = document.createElement('div');
+    card.className = 'video-card';
+    card.innerHTML = `
+      <div class="card-inner">
+        <div class="thumb-wrap">
+          ${thumb
+            ? `<img src="${thumb}" alt="썸네일" onerror="this.style.display='none';this.nextElementSibling.style.display='flex'">`
+            : ''}
+          <div class="thumb-placeholder" ${thumb ? 'style="display:none"' : ''}>🎬</div>
+          <div class="rank ${rankClass}">#${i+1}</div>
+        </div>
+        <div class="card-body">
+          <a class="video-title" href="${url}" target="_blank" rel="noopener">${escHtml(title)}</a>
+          <div class="meta-chips">
+            <span class="meta-chip mc-views">👁 ${formatViews(views)}</span>
+            <span class="meta-chip mc-channel">📺 ${escHtml(channel)}</span>
+            ${duration ? `<span class="meta-chip mc-duration">⏱ ${duration}</span>` : ''}
+          </div>
+          ${tags.length ? `<div class="pattern-tags">${tags.map(t=>`<span class="ptag">${t}</span>`).join('')}</div>` : ''}
+        </div>
+      </div>
+    `;
+    grid.appendChild(card);
+  });
+}
+
+function escHtml(s) {
+  return String(s)
+    .replace(/&/g,'&amp;').replace(/</g,'&lt;')
+    .replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+// ── SUMMARY via Claude API ────────────────────────────
+async function getSummary(videos) {
+  const list = videos.slice(0,10).map((v,i)=>{
+    const title = v.title || v.videoTitle || '';
+    const views = formatViews(v.viewCount || v.views || 0);
+    return `${i+1}. "${title}" | ${views}`;
+  }).join('\n');
+
+  try {
+    const res = await fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        model: 'claude-sonnet-4-6',
+        max_tokens: 1000,
+        messages: [{
+          role: 'user',
+          content: `유튜브 정치/사회/뉴스/풍자 상위 영상 제목 분석:\n\n${list}\n\n아래 4가지를 각 2~3줄로 분석 (한국어):\n1. 공통 제목 패턴\n2. 자극적 키워드 패턴\n3. 고조회수 제목 공식\n4. 썸네일 텍스트 방향 추천`
+        }]
+      })
+    });
+    const data = await res.json();
+    return data.content?.[0]?.text || '';
+  } catch(_) {
+    return '';
+  }
+}
+
+// ── MAIN ──────────────────────────────────────────────
+async function runAnalysis() {
+  const apiKey = loadKey();
+  if (!apiKey) {
+    openModal();
+    return;
+  }
+
+  const keywords = getKeywords();
+  if (!keywords.length) { showError('키워드를 하나 이상 선택하세요.'); return; }
+
+  clearError();
+  document.getElementById('runBtn').disabled = true;
+  document.getElementById('resultsWrap').style.display = 'none';
+  document.getElementById('summaryBox').style.display = 'none';
+
+  const query = keywords.join(' ');
+  setStatus(`"${query}" 검색 시작...`);
+
+  try {
+    const videos = await runApify(apiKey, query);
+
+    if (!videos || videos.length === 0) {
+      showError('결과 없음. 키워드를 바꿔보세요.');
+      hideStatus(); return;
+    }
+
+    renderResults(videos);
+    setStatus('AI 제목 분석 중...');
+
+    const summary = await getSummary(videos);
+    if (summary) {
+      document.getElementById('summaryText').textContent = summary;
+      document.getElementById('summaryBox').style.display = 'block';
+    }
+
+    hideStatus();
+  } catch(err) {
+    hideStatus();
+    showError(err.message);
+  } finally {
+    document.getElementById('runBtn').disabled = false;
+  }
+}
+
+// ── INIT ──────────────────────────────────────────────
+updateKeyIndicator();
+</script>
+</body>
+</html>
